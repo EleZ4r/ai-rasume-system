@@ -25,6 +25,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow AI Resume System to record your mock interview answers."
+        }
+      ]
+    ]
   }
 }
