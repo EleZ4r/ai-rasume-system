@@ -130,6 +130,7 @@ export function StatusBadge({ status }: { status: string }) {
     pending: { label: 'Pending', tone: 'warning' },
     passed: { label: 'Passed', tone: 'success' },
     rejected: { label: 'Not selected', tone: 'danger' },
+    reinterview_requested: { label: 'Re-interview requested', tone: 'warning' },
     analysis_failed: { label: 'Needs attention', tone: 'danger' },
     evaluation_failed: { label: 'Needs attention', tone: 'danger' },
   };

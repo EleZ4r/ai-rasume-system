@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createManagedJob, getApiErrorMessage, listManagedJobs } from '../../services/api';
+import { approveManagedJob, createManagedJob, deleteManagedJob, getApiErrorMessage, listManagedJobs, ManagedJobPayload, updateManagedJob } from '../../services/api';
 import { ActionButton, Header, Screen } from '../../components/AppUI';
 import { colors } from '../../constants/theme';
+import { AuthContext } from '../../context/AuthContext';
 
 type JobListing = {
   id: number;
@@ -13,6 +14,7 @@ type JobListing = {
   employment_type: string;
   description: string;
   required_skills: string[];
+  approval_status?: 'pending' | 'approved';
 };
 
 const emptyForm = {
@@ -25,10 +27,15 @@ const emptyForm = {
 };
 
 export default function JobManagement({ navigation }: any) {
+  const { user } = useContext(AuthContext);
+  const isAdmin = Boolean(user?.is_admin);
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [editingJobId, setEditingJobId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionJobId, setActionJobId] = useState<number | null>(null);
+  const [confirmDeleteJobId, setConfirmDeleteJobId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -49,6 +56,25 @@ export default function JobManagement({ navigation }: any) {
 
   const update = (field: keyof typeof emptyForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingJobId(null);
+  };
+
+  const edit = (job: JobListing) => {
+    setForm({
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      employment_type: job.employment_type,
+      description: job.description,
+      skills: job.required_skills.join(', '),
+    });
+    setEditingJobId(job.id);
+    setMessage(null);
+    setError(null);
+  };
+
   const submit = async () => {
     const requiredSkills = [...new Set(form.skills.split(',').map((skill) => skill.trim()).filter(Boolean))];
     if (!form.title.trim() || !form.company.trim() || !form.description.trim() || requiredSkills.length === 0) {
@@ -60,16 +86,24 @@ export default function JobManagement({ navigation }: any) {
     setError(null);
     setMessage(null);
     try {
-      await createManagedJob({
+      const payload: ManagedJobPayload = {
         title: form.title.trim(),
         company: form.company.trim(),
         location: form.location.trim() || 'Remote',
         employment_type: form.employment_type.trim() || 'Full-time',
         description: form.description.trim(),
         required_skills: requiredSkills,
-      });
-      setForm(emptyForm);
-      setMessage('Job listing added. It is now available for applicant matching.');
+      };
+      if (editingJobId !== null) {
+        await updateManagedJob(editingJobId, payload);
+        setMessage('Job listing updated.');
+      } else {
+        const createdJob = await createManagedJob(payload);
+        setMessage(createdJob.approval_status === 'pending'
+          ? 'Job listing submitted for admin approval. Applicants can see it after approval.'
+          : 'Job listing published and available for applicant matching.');
+      }
+      resetForm();
       await load();
     } catch (requestError: any) {
       setError(getApiErrorMessage(requestError));
@@ -78,16 +112,48 @@ export default function JobManagement({ navigation }: any) {
     }
   };
 
+  const approve = async (jobId: number) => {
+    setActionJobId(jobId);
+    setError(null);
+    setMessage(null);
+    try {
+      await approveManagedJob(jobId);
+      setMessage('Job listing approved and published.');
+      await load();
+    } catch (requestError: any) {
+      setError(getApiErrorMessage(requestError));
+    } finally {
+      setActionJobId(null);
+    }
+  };
+
+  const remove = async (jobId: number) => {
+    setActionJobId(jobId);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await deleteManagedJob(jobId);
+      setMessage(result.message || 'Job listing removed.');
+      setConfirmDeleteJobId(null);
+      if (editingJobId === jobId) resetForm();
+      await load();
+    } catch (requestError: any) {
+      setError(getApiErrorMessage(requestError));
+    } finally {
+      setActionJobId(null);
+    }
+  };
+
   return (
     <Screen scroll>
-      <Header eyebrow="PEOPLE & TALENT" title="Job listings" subtitle="Create openings that applicants can discover through their verified skills." />
+      <Header eyebrow="PEOPLE & TALENT" title="Job listings" subtitle={isAdmin ? 'Review HR submissions and manage published openings.' : 'Submit openings for admin approval and track their status.'} />
 
       <View style={styles.section}>
         <View style={styles.formHeading}>
           <View style={styles.formIcon}><Ionicons name="briefcase-outline" size={20} color="#1677ff" /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.sectionTitle}>Create a job listing</Text>
-            <Text style={styles.formHint}>Add the role details and skills applicants should have.</Text>
+            <Text style={styles.formHint}>{editingJobId !== null ? 'Update the listing details and required skills.' : isAdmin ? 'Publish an approved opening for applicant matching.' : 'Your listing will be sent to an administrator for approval.'}</Text>
           </View>
         </View>
         <Text style={styles.label}>Job title</Text>
@@ -106,12 +172,13 @@ export default function JobManagement({ navigation }: any) {
         {error ? <View accessibilityRole="alert" style={styles.notice}><Ionicons name="alert-circle-outline" size={18} color="#b42318" /><Text style={styles.error}>{error}</Text></View> : null}
         {message ? <View accessibilityRole="alert" style={[styles.notice, styles.successNotice]}><Ionicons name="checkmark-circle-outline" size={18} color="#147443" /><Text style={styles.success}>{message}</Text></View> : null}
         <View style={{ marginTop: 16 }}>
-          {saving ? <View style={styles.saving}><ActivityIndicator color="#1677ff" /><Text style={styles.savingText}>Adding job listing...</Text></View> : <ActionButton title="Publish job listing" disabled={saving} icon="add-circle-outline" onPress={submit} />}
+          {saving ? <View style={styles.saving}><ActivityIndicator color="#1677ff" /><Text style={styles.savingText}>{editingJobId !== null ? 'Saving changes...' : 'Adding job listing...'}</Text></View> : <ActionButton title={editingJobId !== null ? 'Save changes' : isAdmin ? 'Publish job listing' : 'Submit for approval'} disabled={saving || actionJobId !== null} icon={editingJobId !== null ? 'save-outline' : 'add-circle-outline'} onPress={submit} />}
+          {editingJobId !== null && !saving ? <View style={{ marginTop: 8 }}><ActionButton title="Cancel editing" secondary onPress={resetForm} /></View> : null}
         </View>
       </View>
 
       <View style={styles.listHeader}>
-        <View><Text style={styles.sectionTitle}>Published roles</Text><Text style={styles.listHint}>{jobs.length} {jobs.length === 1 ? 'listing' : 'listings'} available</Text></View>
+        <View><Text style={styles.sectionTitle}>{isAdmin ? 'All job listings' : 'Your job listings'}</Text><Text style={styles.listHint}>{jobs.length} {jobs.length === 1 ? 'listing' : 'listings'} · {jobs.filter((job) => job.approval_status === 'approved').length} approved</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Refresh job listings" onPress={load} style={styles.refreshButton}><Ionicons name="refresh-outline" size={15} color="#1677ff" /><Text style={styles.refresh}>Refresh</Text></Pressable>
       </View>
       {loading ? <View style={styles.loading}><ActivityIndicator color="#1677ff" /><Text style={styles.listHint}>Loading job listings...</Text></View> : jobs.length === 0 ? (
@@ -128,12 +195,25 @@ export default function JobManagement({ navigation }: any) {
               <Text style={styles.jobTitle}>{job.title}</Text>
               <Text style={styles.company}>{job.company} · {job.location}</Text>
             </View>
-            <Ionicons name="checkmark-circle" size={18} color="#147443" />
+            <View style={[styles.approvalBadge, job.approval_status === 'approved' ? styles.approvedBadge : styles.pendingBadge]}>
+              <Text style={[styles.approvalText, job.approval_status === 'approved' ? styles.approvedText : styles.pendingText]}>{job.approval_status === 'pending' ? 'Pending approval' : 'Approved'}</Text>
+            </View>
           </View>
           <View style={styles.employment}><Text style={styles.employmentText}>{job.employment_type}</Text></View>
           <Text style={styles.description}>{job.description}</Text>
           <Text style={styles.skillsLabel}>REQUIRED SKILLS</Text>
           <View style={styles.skillList}>{job.required_skills.map((skill) => <View key={skill} style={styles.skill}><Text style={styles.skills}>{skill}</Text></View>)}</View>
+          {isAdmin ? <View style={styles.jobActions}>
+            {job.approval_status !== 'approved' ? <ActionButton title="Approve and publish" disabled={actionJobId !== null} onPress={() => approve(job.id)} /> : null}
+            <ActionButton title="Edit listing" secondary disabled={saving || actionJobId !== null} onPress={() => edit(job)} />
+            {confirmDeleteJobId === job.id ? <View style={styles.deleteConfirm}>
+              <Text style={styles.deleteConfirmText}>Remove this listing? Existing application history will be preserved.</Text>
+              <View style={styles.confirmActions}>
+                <ActionButton title={actionJobId === job.id ? 'Removing...' : 'Confirm removal'} disabled={actionJobId !== null} onPress={() => remove(job.id)} />
+                <ActionButton title="Cancel" secondary disabled={actionJobId !== null} onPress={() => setConfirmDeleteJobId(null)} />
+              </View>
+            </View> : <ActionButton title="Remove listing" secondary disabled={saving || actionJobId !== null} onPress={() => setConfirmDeleteJobId(job.id)} />}
+          </View> : null}
         </View>
       ))}
     </Screen>
@@ -169,6 +249,12 @@ const styles: Record<string, any> = {
   emptyHint: { color: '#71819a', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 5 },
   job: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 8, padding: 17, marginTop: 9 },
   jobHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  approvalBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  approvedBadge: { backgroundColor: colors.successSoft },
+  pendingBadge: { backgroundColor: colors.warningSoft },
+  approvalText: { fontSize: 10, fontWeight: '800' },
+  approvedText: { color: colors.success },
+  pendingText: { color: colors.warning },
   jobIcon: { width: 38, height: 38, borderRadius: 8, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   jobTitle: { color: '#12233f', fontSize: 14, fontWeight: '800' },
   company: { color: '#71819a', fontSize: 11, marginTop: 4 },
@@ -179,4 +265,8 @@ const styles: Record<string, any> = {
   skillList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
   skill: { backgroundColor: '#e5f5eb', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 5 },
   skills: { color: '#167044', fontSize: 10, fontWeight: '700' },
+  jobActions: { gap: 8, marginTop: 14 },
+  deleteConfirm: { backgroundColor: '#fff7f6', borderWidth: 1, borderColor: '#f1c9c6', borderRadius: 8, padding: 12, gap: 10 },
+  deleteConfirmText: { color: colors.ink, fontSize: 12, lineHeight: 18 },
+  confirmActions: { gap: 8 },
 };

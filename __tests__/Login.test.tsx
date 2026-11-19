@@ -124,7 +124,7 @@ test('lets auth state switch the root navigator after successful login', async (
   expect(navigation.replace).not.toHaveBeenCalled();
 });
 
-test('does not show failed state when strengths exist even if score is missing', async () => {
+test('offers retry when the review summary exists but the overall score is missing', async () => {
   (api.getResume as jest.Mock).mockResolvedValue({
     id: 10,
     filename: 'resume.pdf',
@@ -140,17 +140,105 @@ test('does not show failed state when strengths exist even if score is missing',
       reviewer_basis: 'Resume evidence',
     }],
   });
+  (api.analyzeResume as jest.Mock).mockResolvedValue({ message: 'Analysis queued' });
 
-  const { findByText, queryByText } = render(
+  const { findByText } = render(
     <AuthContext.Provider value={{ user: { id: 1, name: 'Test User' }, token: 'abc', loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
       <ResumeAnalysis route={{ params: { resumeId: 10 } }} navigation={{ canGoBack: () => false, navigate: jest.fn(), goBack: jest.fn() }} />
     </AuthContext.Provider>
   );
 
-  expect(queryByText('Analysis incomplete')).toBeNull();
   expect(await findByText('Problem solving')).toBeTruthy();
   expect(await findByText('Limited production experience')).toBeTruthy();
-  expect(await findByText('AI review complete')).toBeTruthy();
+  expect(await findByText('Analysis incomplete')).toBeTruthy();
+  expect(await findByText('Analysis failed')).toBeTruthy();
+  fireEvent.press(await findByText('Retry analysis'));
+  expect(api.analyzeResume).toHaveBeenCalledWith(10);
+});
+
+test('shows a clear failed state and moves into progress after retrying analysis', async () => {
+  const failedResume = {
+    id: 10,
+    filename: 'resume.pdf',
+    status: 'analysis_failed',
+    text: 'resume text',
+    resume_analyses: [{ id: 2, raw_response: { error: 'Provider unavailable' } }],
+  };
+  (api.getResume as jest.Mock)
+    .mockResolvedValueOnce(failedResume)
+    .mockResolvedValue({ ...failedResume, status: 'processing' });
+  (api.analyzeResume as jest.Mock).mockResolvedValue({ message: 'Analysis queued' });
+
+  const { findByText, queryByText } = render(
+    <AuthContext.Provider value={{ user: null, token: null, loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
+      <ResumeAnalysis route={{ params: { resumeId: 10 } }} navigation={{ canGoBack: () => false, navigate: jest.fn(), goBack: jest.fn() }} />
+    </AuthContext.Provider>
+  );
+
+  expect(await findByText('Analysis failed')).toBeTruthy();
+  expect(queryByText('Waiting for results')).toBeNull();
+  fireEvent.press(await findByText('Retry analysis'));
+
+  expect(api.analyzeResume).toHaveBeenCalledWith(10);
+  expect(await findByText('Your analysis is being prepared. This page updates automatically.')).toBeTruthy();
+  expect(await findByText('Analysis in progress')).toBeTruthy();
+});
+
+test('offers retry when the API says processed but returned no review fields', async () => {
+  const processedWithoutReview = {
+    id: 10,
+    filename: 'resume.pdf',
+    status: 'processed',
+    text: 'resume text',
+    resume_analyses: [{
+      id: 3,
+      score: null,
+      strengths: [],
+      weaknesses: [],
+      suggestions: [],
+      reviewer_basis: null,
+      verification_questions: Array.from({ length: 30 }, (_, index) => ({
+        question_type: 'essay',
+        question: `Question ${index + 1}`,
+      })),
+    }],
+  };
+  (api.getResume as jest.Mock)
+    .mockResolvedValueOnce(processedWithoutReview)
+    .mockResolvedValue({ ...processedWithoutReview, status: 'processing' });
+  (api.analyzeResume as jest.Mock).mockResolvedValue({ message: 'Analysis queued' });
+
+  const { findByText, queryByText } = render(
+    <AuthContext.Provider value={{ user: null, token: null, loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
+      <ResumeAnalysis route={{ params: { resumeId: 10 } }} navigation={{ canGoBack: () => false, navigate: jest.fn(), goBack: jest.fn() }} />
+    </AuthContext.Provider>
+  );
+
+  expect(await findByText('Analysis incomplete')).toBeTruthy();
+  expect(queryByText('Waiting for AI review results...')).toBeNull();
+  fireEvent.press(await findByText('Retry analysis'));
+  expect(api.analyzeResume).toHaveBeenCalledWith(10);
+  expect(await findByText('Analysis in progress')).toBeTruthy();
+});
+
+test('shows a retry error instead of silently failing', async () => {
+  (api.getResume as jest.Mock).mockResolvedValue({
+    id: 10,
+    filename: 'resume.pdf',
+    status: 'analysis_failed',
+    text: 'resume text',
+    resume_analyses: [],
+  });
+  (api.analyzeResume as jest.Mock).mockRejectedValue(new Error('The API is unavailable.'));
+
+  const { findByText } = render(
+    <AuthContext.Provider value={{ user: null, token: null, loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
+      <ResumeAnalysis route={{ params: { resumeId: 10 } }} navigation={{ canGoBack: () => false, navigate: jest.fn(), goBack: jest.fn() }} />
+    </AuthContext.Provider>
+  );
+
+  fireEvent.press(await findByText('Retry analysis'));
+  expect(await findByText('The API is unavailable.')).toBeTruthy();
 });
 
 test.each([

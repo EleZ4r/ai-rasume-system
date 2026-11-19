@@ -13,8 +13,9 @@ type Job = {
   description: string;
   required_skills: string[];
   matched_skills: string[];
+  skill_match_details?: Array<{ required_skill: string; verified_skill: string; reason: string }>;
   match_score: number;
-  application?: { id: number; status: string; mock_interviews?: Array<{ id: number; status: string }> } | null;
+  application?: { id: number; status: string; retry_allowed?: boolean; mock_interviews?: Array<{ id: number; status: string }> } | null;
 };
 
 const modernStyles = StyleSheet.create({
@@ -62,11 +63,12 @@ export default function JobRecommendations({ route, navigation }: any) {
 
   const beginInterview = async (job: Job) => {
     setBusyJobId(job.id);
-    setBusyPhase(job.application ? 'Generating interview questions...' : 'Submitting application...');
+    const shouldReapply = Boolean(job.application?.retry_allowed);
+    setBusyPhase(job.application && !shouldReapply ? 'Generating interview questions...' : 'Submitting application...');
     setError(null);
     try {
       let application = job.application;
-      if (!application) {
+      if (!application || shouldReapply) {
         application = await applyToJob(resumeId, job.id);
         setBusyPhase('Generating interview questions...');
       }
@@ -116,9 +118,14 @@ export default function JobRecommendations({ route, navigation }: any) {
           <Text style={styles.description}>{job.description}</Text>
           <Text style={styles.label}>MATCHED SKILLS</Text>
           <View style={styles.skills}>{job.matched_skills.map((skill) => <View key={skill} style={[styles.matchedSkill, modernStyles.skill]}><Text style={[styles.matchedSkillText, modernStyles.skillText]}>{skill}</Text></View>)}</View>
+          {job.skill_match_details?.filter((match) => match.required_skill.toLowerCase() !== match.verified_skill.toLowerCase()).map((match) => (
+            <Text key={`${match.required_skill}-${match.verified_skill}`} style={styles.matchReason}>
+              {match.required_skill} matches your verified {match.verified_skill} skill: {match.reason}
+            </Text>
+          ))}
           <Text style={styles.required}>Also requested: {job.required_skills.filter((skill) => !job.matched_skills.includes(skill)).join(', ') || 'All required skills verified'}</Text>
           <Pressable accessibilityRole="button" style={[styles.apply, modernStyles.apply]} disabled={busyJobId !== null} onPress={() => beginInterview(job)}>
-            <Text style={styles.applyText}>{busyJobId === job.id ? busyPhase : job.application ? job.application.mock_interviews?.some((interview) => interview.status === 'in_progress') ? 'Continue mock interview' : 'Retry mock interview' : 'Apply and start mock interview'}</Text>
+            <Text style={styles.applyText}>{busyJobId === job.id ? busyPhase : job.application?.retry_allowed ? 'Resubmit application and start interview' : job.application ? job.application.mock_interviews?.some((interview) => interview.status === 'in_progress') ? 'Continue mock interview' : job.application.status === 'reinterview_requested' ? 'Start requested re-interview' : 'Retry mock interview' : 'Apply and start mock interview'}</Text>
           </Pressable>
         </View>
       ))}
@@ -128,5 +135,5 @@ export default function JobRecommendations({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f4f7fb' }, content: { width: '100%', maxWidth: 920, alignSelf: 'center', padding: 22, paddingBottom: 48 }, centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#f4f7fb' },     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }, headingCopy: { flex: 1, minWidth: 0 }, eyebrow: { color: '#1677ff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }, title: { color: '#12233f', fontSize: 28, fontWeight: '800', marginTop: 5 }, compactTitle: { fontSize: 24 }, intro: { color: '#52627a', fontSize: 14, lineHeight: 21, marginTop: 8 }, refresh: { borderWidth: 1, borderColor: '#ccd6e5', backgroundColor: '#fff', borderRadius: 6, paddingHorizontal: 13, paddingVertical: 9 }, refreshText: { color: '#29415f', fontWeight: '700' }, skillBand: { backgroundColor: '#12233f', padding: 16, borderRadius: 8, marginTop: 18 }, label: { color: '#8499b4', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginTop: 12, marginBottom: 7 }, skills: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 }, skill: { backgroundColor: '#243d5e', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5 }, skillText: { color: '#e6effb', fontSize: 12, fontWeight: '700' }, job: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e7ef', borderRadius: 8, padding: 17, marginTop: 12 }, jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }, jobHeading: { flex: 1, minWidth: 0 }, jobTitle: { color: '#12233f', fontSize: 18, lineHeight: 24, fontWeight: '800' }, company: { color: '#52627a', fontSize: 13, marginTop: 4 }, match: { minWidth: 58, alignItems: 'center', backgroundColor: '#e5f5eb', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 }, matchNumber: { color: '#167044', fontSize: 18, fontWeight: '800' }, matchLabel: { color: '#167044', fontSize: 10, fontWeight: '700' }, meta: { color: '#1677ff', fontSize: 12, fontWeight: '700', marginTop: 12 }, description: { color: '#52627a', fontSize: 13, lineHeight: 20, marginTop: 7 }, matchedSkill: { backgroundColor: '#e5f5eb', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5 }, matchedSkillText: { color: '#167044', fontSize: 12, fontWeight: '700' }, required: { color: '#8795a8', fontSize: 11, lineHeight: 17, marginTop: 9 }, apply: { alignItems: 'center', backgroundColor: '#1677ff', borderRadius: 6, paddingVertical: 12, paddingHorizontal: 14, marginTop: 15 }, applyText: { color: '#fff', fontSize: 13, fontWeight: '800', textAlign: 'center' }, error: { borderWidth: 1, borderColor: '#f3c6c4', backgroundColor: '#fff5f4', borderRadius: 6, padding: 12, marginTop: 14 }, errorText: { color: '#a22b24', fontSize: 13 }, empty: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e7ef', borderRadius: 8, padding: 18, marginTop: 14 }, muted: { color: '#52627a', fontSize: 13, lineHeight: 20, marginTop: 8 }, back: { alignSelf: 'flex-start', marginTop: 18, paddingVertical: 10, paddingHorizontal: 4 }, backText: { color: '#29415f', fontSize: 13, fontWeight: '700' },
+  page: { flex: 1, backgroundColor: '#f4f7fb' }, content: { width: '100%', maxWidth: 920, alignSelf: 'center', padding: 22, paddingBottom: 48 }, centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#f4f7fb' },     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }, headingCopy: { flex: 1, minWidth: 0 }, eyebrow: { color: '#1677ff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }, title: { color: '#12233f', fontSize: 28, fontWeight: '800', marginTop: 5 }, compactTitle: { fontSize: 24 }, intro: { color: '#52627a', fontSize: 14, lineHeight: 21, marginTop: 8 }, refresh: { borderWidth: 1, borderColor: '#ccd6e5', backgroundColor: '#fff', borderRadius: 6, paddingHorizontal: 13, paddingVertical: 9 }, refreshText: { color: '#29415f', fontWeight: '700' }, skillBand: { backgroundColor: '#12233f', padding: 16, borderRadius: 8, marginTop: 18 }, label: { color: '#8499b4', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginTop: 12, marginBottom: 7 }, skills: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 }, skill: { backgroundColor: '#243d5e', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5 }, skillText: { color: '#e6effb', fontSize: 12, fontWeight: '700' }, job: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e7ef', borderRadius: 8, padding: 17, marginTop: 12 }, jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }, jobHeading: { flex: 1, minWidth: 0 }, jobTitle: { color: '#12233f', fontSize: 18, lineHeight: 24, fontWeight: '800' }, company: { color: '#52627a', fontSize: 13, marginTop: 4 }, match: { minWidth: 58, alignItems: 'center', backgroundColor: '#e5f5eb', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 }, matchNumber: { color: '#167044', fontSize: 18, fontWeight: '800' }, matchLabel: { color: '#167044', fontSize: 10, fontWeight: '700' }, meta: { color: '#1677ff', fontSize: 12, fontWeight: '700', marginTop: 12 }, description: { color: '#52627a', fontSize: 13, lineHeight: 20, marginTop: 7 }, matchedSkill: { backgroundColor: '#e5f5eb', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5 }, matchedSkillText: { color: '#167044', fontSize: 12, fontWeight: '700' }, matchReason: { color: '#52627a', fontSize: 11, lineHeight: 16, marginTop: 7 }, required: { color: '#8795a8', fontSize: 11, lineHeight: 17, marginTop: 9 }, apply: { alignItems: 'center', backgroundColor: '#1677ff', borderRadius: 6, paddingVertical: 12, paddingHorizontal: 14, marginTop: 15 }, applyText: { color: '#fff', fontSize: 13, fontWeight: '800', textAlign: 'center' }, error: { borderWidth: 1, borderColor: '#f3c6c4', backgroundColor: '#fff5f4', borderRadius: 6, padding: 12, marginTop: 14 }, errorText: { color: '#a22b24', fontSize: 13 }, empty: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e1e7ef', borderRadius: 8, padding: 18, marginTop: 14 }, muted: { color: '#52627a', fontSize: 13, lineHeight: 20, marginTop: 8 }, back: { alignSelf: 'flex-start', marginTop: 18, paddingVertical: 10, paddingHorizontal: 4 }, backText: { color: '#29415f', fontSize: 13, fontWeight: '700' },
 });

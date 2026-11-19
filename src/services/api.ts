@@ -182,15 +182,32 @@ export async function listManagedJobs() {
   return res.data;
 }
 
-export async function createManagedJob(payload: {
+export type ManagedJobPayload = {
   title: string;
   company: string;
   location: string;
   employment_type: string;
   description: string;
   required_skills: string[];
-}) {
+};
+
+export async function createManagedJob(payload: ManagedJobPayload) {
   const res = await api.post('admin/jobs', payload);
+  return res.data;
+}
+
+export async function updateManagedJob(jobId: number, payload: ManagedJobPayload) {
+  const res = await api.put(`admin/jobs/${jobId}`, payload);
+  return res.data;
+}
+
+export async function approveManagedJob(jobId: number) {
+  const res = await api.post(`admin/jobs/${jobId}/approve`);
+  return res.data;
+}
+
+export async function deleteManagedJob(jobId: number) {
+  const res = await api.delete(`admin/jobs/${jobId}`);
   return res.data;
 }
 
@@ -208,7 +225,7 @@ export function resolveAdminInterviewAudioUrl(path: string) {
   return new URL(path, api.defaults.baseURL).toString();
 }
 
-export async function decideAdminInterview(interviewId: number, decision: 'passed' | 'rejected', note: string) {
+export async function decideAdminInterview(interviewId: number, decision: 'passed' | 'rejected' | 'reinterview_requested', note: string) {
   const res = await api.post(`admin/mock-interviews/${interviewId}/decision`, { decision, note });
   return res.data;
 }

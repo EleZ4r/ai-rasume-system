@@ -13,13 +13,23 @@ type ApplicationUpdate = {
   job: { title: string; company: string };
   interview: {
     status: string;
-    review_decision: 'passed' | 'rejected' | null;
+    review_decision: 'passed' | 'rejected' | 'reinterview_requested' | null;
     review_note: string | null;
     reviewed_at: string | null;
   } | null;
 };
 
 function getUpdatePresentation(update: ApplicationUpdate) {
+  if (update.interview?.review_decision === 'reinterview_requested') {
+    return {
+      title: 'Another interview requested',
+      message: `HR would like another interview for ${update.job.title}. Open job recommendations to start it.`,
+      icon: 'refresh-circle-outline' as const,
+      color: colors.primary,
+      background: colors.primarySoft,
+    };
+  }
+
   if (update.interview?.review_decision === 'passed') {
     return {
       title: 'You passed your interview',

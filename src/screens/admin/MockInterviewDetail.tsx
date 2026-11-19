@@ -31,13 +31,17 @@ export default function MockInterviewDetail({ route, navigation }: any) {
 
   useEffect(() => { load(); }, [interviewId]);
 
-  const decide = async (decision: 'passed' | 'rejected') => {
+  const decide = async (decision: 'passed' | 'rejected' | 'reinterview_requested') => {
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
       await decideAdminInterview(interviewId, decision, note);
-      setMessage(decision === 'passed' ? 'Applicant marked as passed.' : 'Applicant marked as rejected.');
+      setMessage({
+        passed: 'Applicant marked as passed.',
+        rejected: 'Applicant marked as rejected.',
+        reinterview_requested: 'Another interview has been requested.',
+      }[decision]);
       await load();
     } catch (requestError: any) {
       setError(getApiErrorMessage(requestError));
@@ -50,6 +54,11 @@ export default function MockInterviewDetail({ route, navigation }: any) {
   if (!interview) return <Screen><Header eyebrow="HR / ADMIN REVIEW" title="Interview unavailable" subtitle={error || 'Could not load this interview.'} /><ActionButton title="Try again" onPress={load} /></Screen>;
 
   const report = interview.report || {};
+  const decisionLabels: Record<string, string> = {
+    passed: 'Passed',
+    rejected: 'Not selected',
+    reinterview_requested: 'Re-interview requested',
+  };
   return (
     <Screen scroll>
       <View style={{ alignSelf: 'flex-start', marginBottom: 4 }}><ActionButton title="Back to interview reviews" secondary icon="arrow-back-outline" onPress={() => navigation.goBack()} /></View>
@@ -61,7 +70,7 @@ export default function MockInterviewDetail({ route, navigation }: any) {
           <Detail label="Email" value={interview.applicant?.email} />
           <Detail label="Resume" value={interview.resume?.filename} />
           <Detail label="Interview status" value={interview.status} />
-          <Detail label="Decision" value={interview.review_decision || 'Pending'} />
+          <Detail label="Decision" value={decisionLabels[interview.review_decision] || interview.review_decision || 'Pending'} />
         </View>
       </Card>
 
@@ -113,6 +122,9 @@ export default function MockInterviewDetail({ route, navigation }: any) {
         <View style={styles.decisionRow}>
           <View style={{ flex: 1 }}><ActionButton title={saving ? 'Saving...' : 'Pass applicant'} disabled={saving || interview.status !== 'completed'} onPress={() => decide('passed')} /></View>
           <View style={{ flex: 1 }}><ActionButton title={saving ? 'Saving...' : 'Reject applicant'} secondary disabled={saving || interview.status !== 'completed'} onPress={() => decide('rejected')} /></View>
+        </View>
+        <View style={{ marginTop: 8 }}>
+          <ActionButton title={saving ? 'Saving...' : 'Request another interview'} secondary disabled={saving || interview.status !== 'completed'} onPress={() => decide('reinterview_requested')} />
         </View>
       </Card>
     </Screen>
