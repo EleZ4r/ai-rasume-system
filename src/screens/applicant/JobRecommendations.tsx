@@ -44,6 +44,7 @@ export default function JobRecommendations({ route, navigation }: any) {
   const [busyJobId, setBusyJobId] = useState<number | null>(null);
   const [busyPhase, setBusyPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -51,8 +52,10 @@ export default function JobRecommendations({ route, navigation }: any) {
       const result = await getJobRecommendations(resumeId);
       setJobs(Array.isArray(result.jobs) ? result.jobs : []);
       setVerifiedSkills(Array.isArray(result.verified_skills) ? result.verified_skills : []);
+      setWarning(typeof result.warning === 'string' ? result.warning : null);
       setError(null);
     } catch (requestError: any) {
+      setWarning(null);
       setError(getApiErrorMessage(requestError));
     } finally {
       setLoading(false);
@@ -107,6 +110,7 @@ export default function JobRecommendations({ route, navigation }: any) {
         <View style={styles.skills}>{verifiedSkills.map((skill) => <View key={skill} style={[styles.skill, modernStyles.skill]}><Text style={[styles.skillText, modernStyles.skillText]}>{skill}</Text></View>)}</View>
       </View>
 
+      {warning ? <View style={[styles.error, { borderColor: '#ead9a2', backgroundColor: '#fff8df' }]}><Text style={[styles.errorText, { color: '#735b16' }]}>{warning}</Text></View> : null}
       {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text></View> : null}
       {jobs.length === 0 ? <View style={styles.empty}><Text style={styles.jobTitle}>No close matches yet</Text><Text style={styles.muted}>Your verified skills did not match the current openings. More listings may be added later.</Text></View> : jobs.map((job) => (
           <View key={job.id} style={[styles.job, modernStyles.job]}>

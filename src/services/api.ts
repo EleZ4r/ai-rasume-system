@@ -3,14 +3,12 @@ import axios from 'axios';
 const isBrowser = typeof window !== 'undefined' && typeof window.location !== 'undefined';
 const isWeb = isBrowser && typeof document !== 'undefined';
 
-const defaultApiBase = isWeb && window.location.hostname === 'localhost'
-  ? 'http://localhost:8000/api'
-  : 'http://192.168.100.228:8000/api';
+const defaultApiBase = isWeb
+  ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+  : 'http://localhost:8000/api';
 
-const envBase = process.env.EXPO_PUBLIC_API_URL || defaultApiBase;
-const API_BASE = (isWeb && envBase.includes('192.168.100.228')
-  ? 'http://localhost:8000/api'
-  : envBase).replace(/\/+$/, '');
+const API_BASE = (isWeb ? defaultApiBase : process.env.EXPO_PUBLIC_API_URL || defaultApiBase)
+  .replace(/\/+$/, '');
 
 const api = axios.create({
   baseURL: `${API_BASE}/`,
@@ -35,6 +33,13 @@ export function getApiErrorMessage(error: any) {
   const validationErrors = response?.errors;
   if (validationErrors) {
     return Object.values(validationErrors).flat().join(' ');
+  }
+
+  if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT') {
+    return 'The upload took too long. Check your connection and try again.';
+  }
+  if (error?.message === 'Network Error') {
+    return 'Could not reach the API. Keep your phone and computer on the same Wi-Fi and try again.';
   }
 
   return response?.message || error?.message || 'Unable to connect to the API';
@@ -65,11 +70,24 @@ export async function listUserResumes() {
   return res.data;
 }
 
-export async function uploadResume(fileUri: string, filename: string, mimeType = 'application/pdf', resumeId?: number) {
+export async function uploadResume(
+  fileUri: string,
+  filename: string,
+  mimeType = 'application/pdf',
+  resumeId?: number,
+  webFile?: Blob,
+) {
   const form = new FormData();
 
-  if (typeof window !== 'undefined') {
-    const file = await fetch(fileUri).then((response) => response.blob());
+  if (isWeb) {
+    let file = webFile;
+    if (!file) {
+      const response = await fetch(fileUri);
+      if (!response.ok) {
+        throw new Error('Could not read the selected PDF. Please choose it again.');
+      }
+      file = await response.blob();
+    }
     form.append('file', file, filename);
   } else {
     // React Native FormData expects a URI-backed file object.
@@ -77,17 +95,20 @@ export async function uploadResume(fileUri: string, filename: string, mimeType =
     form.append('file', { uri: fileUri, name: filename, type: mimeType });
   }
 
-  const res = resumeId
-    ? await api.put(`resume/${resumeId}/replace`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-    : await api.post('resume/upload', form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+  if (resumeId) {
+    form.append('_method', 'PUT');
+  }
+
+  const res = await api.post(
+    resumeId ? `resume/${resumeId}/replace` : 'resume/upload',
+    form,
+    {
+      timeout: 120000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
 
   return res.data;
 }

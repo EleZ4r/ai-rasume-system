@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ai-resume-system",
+    "name": "Galila",
     "slug": "ai-resume-system",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -25,14 +25,14 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/logo.png"
     },
     "plugins": [
       "expo-asset",
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow AI Resume System to record your mock interview answers."
+          "microphonePermission": "Allow Galila to record your mock interview answers."
         }
       ]
     ]

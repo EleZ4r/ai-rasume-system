@@ -52,16 +52,29 @@ export default function ResumeUpload({ navigation }: any) {
 
   const pick = async () => {
     try {
+      setStatus(null);
       const res = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
+        base64: false,
       });
       if (res.canceled) return;
 
+      const file = res.assets[0];
+      if (file.size !== undefined && file.size > 10 * 1024 * 1024) {
+        setStatus('This PDF is larger than 10 MB. Choose a smaller file.');
+        return;
+      }
+
       setStatus('Checking and uploading your PDF...');
       setUploading(true);
-      const file = res.assets[0];
-      const upload = await uploadResume(file.uri, file.name ?? 'resume.pdf', file.mimeType ?? 'application/pdf', resume?.id);
+      const upload = await uploadResume(
+        file.uri,
+        file.name ?? 'resume.pdf',
+        file.mimeType ?? 'application/pdf',
+        resume?.id,
+        file.file,
+      );
       await analyzeResume(upload.id);
       setStatus('Resume accepted. Analysis queued.');
       setResume(upload);

@@ -13,6 +13,11 @@ browser-based HR/admin review workspace.
 
 ## What the system does
 
+### Public homepage
+
+The mobile app and Expo web experience open on a public welcome page with
+shortcuts to applicant registration and sign-in. Staff use the same sign-in.
+
 ### Applicant workflow
 
 1. Register or sign in.
@@ -70,7 +75,9 @@ php artisan key:generate
 ```
 
 Edit `ai-resume-api\.env` locally. Set the AI provider key and confirm the
-database, queue, and application URL settings. Do not commit `.env`.
+database, queue, and application URL settings. For phone/web testing, set
+`APP_URL=http://<PC-LAN-IP>:8000` and `LOCAL_DEV_IP=<PC-LAN-IP>` to the PC's
+current Wi-Fi IPv4 address. Do not commit `.env`.
 
 Then prepare the database:
 
@@ -155,6 +162,45 @@ npx expo start --tunnel
 The tunnel is for reaching the Expo development server; the phone still needs a
 working route to the API. For a phone network check, open
 `http://<PC-LAN-IP>:8000/up` in the phone browser.
+
+## Android demo build (EAS)
+
+The API deployment files target a Render web service and Neon Postgres. The
+Render free service sleeps after inactivity and its local filesystem is
+ephemeral; uploaded resumes and recordings can disappear after a restart. Keep
+this setup to synthetic demo data only.
+
+Create the API service from the private `ai-resume-api` GitHub repository and
+use its `render.yaml` Blueprint. Configure the `DB_HOST`, `DB_DATABASE`,
+`DB_USERNAME`, and `DB_PASSWORD` values from the Neon project's connection
+details, plus `GROQ_API_KEY` and unique admin/HR seed credentials. Keep all of
+these server values in Render; never send them in chat or put them in the
+mobile app.
+
+The app needs the deployed API before an installable build can sign in or load
+data. In the Expo project's `preview` environment, set
+`EXPO_PUBLIC_API_URL` to the Render API's public HTTPS URL ending in `/api`
+(for example, `https://your-api.example.com/api`). This URL is public app
+configuration; never put the AI-provider key or other server secrets in the
+mobile app. EAS builds fail if the API URL is missing or is not HTTPS.
+
+For a free internal demo APK:
+
+1. Deploy the Laravel API first. The Render image runs migrations and a queue
+   worker; use Render's **Free** plan for this synthetic-data demo.
+2. Create an Expo account, then from this project run `npx eas-cli@latest login`
+   and `npx eas-cli@latest init` to link the project.
+3. Add `EXPO_PUBLIC_API_URL` in the Expo project's **preview** environment.
+4. Run `npx eas-cli@latest build --platform android --profile preview`.
+   EAS can create the Android signing credentials; keep those credentials
+   private and backed up.
+5. Install the generated APK on test devices. Use synthetic data only: free
+   hosting may sleep and may not preserve uploaded files or database changes.
+
+The `production` profile creates an Android App Bundle for Play distribution;
+it does not publish the app automatically. Publishing requires a Play Console
+developer account. Do not use the free demo setup for real applicant records
+or interview recordings.
 
 ## Tests and checks
 

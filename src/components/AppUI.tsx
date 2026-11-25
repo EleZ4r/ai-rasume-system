@@ -1,7 +1,13 @@
 import React, { ReactNode } from 'react';
-import { KeyboardTypeOptions, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Image, ImageSourcePropType, KeyboardTypeOptions, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
+
+const brandLogo = require('../../assets/logo.png');
+
+export function BrandLogo({ size = 36 }: { size?: number }) {
+  return <Image source={brandLogo} style={{ width: size, height: size, resizeMode: 'contain' }} accessibilityLabel="Galila logo" />;
+}
 
 export function Screen({ children, scroll = false }: { children: ReactNode; scroll?: boolean }) {
   const { width } = useWindowDimensions();
@@ -21,14 +27,21 @@ export function Screen({ children, scroll = false }: { children: ReactNode; scro
   return <View style={styles.screen}><View style={[contentStyle, styles.flexContent]}>{children}</View></View>;
 }
 
-export function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+export function Header({ eyebrow, title, subtitle, logo = brandLogo }: { eyebrow?: string; title: string; subtitle?: string; logo?: ImageSourcePropType }) {
   const { width } = useWindowDimensions();
   const compact = width < 420;
 
   return (
     <View style={styles.header}>
       {eyebrow ? <View style={styles.eyebrowRow}><View style={styles.eyebrowMark} /><Text style={styles.eyebrow}>{eyebrow}</Text></View> : null}
-      <Text style={[styles.title, compact && styles.compactTitle]} accessibilityRole="header">{title}</Text>
+      {logo ? (
+        <View style={styles.titleRow}>
+          <Image source={logo} style={styles.headerLogo} accessibilityLabel="Galila logo" />
+          <Text style={[styles.title, styles.logoTitle, compact && styles.compactLogoTitle]} accessibilityRole="header">{title}</Text>
+        </View>
+      ) : (
+        <Text style={[styles.title, compact && styles.compactTitle]} accessibilityRole="header">{title}</Text>
+      )}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
@@ -160,6 +173,10 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1 },
   flexContent: { flex: 1 },
   header: { marginBottom: 24 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  headerLogo: { width: 36, height: 36, marginRight: 10, resizeMode: 'contain' },
+  logoTitle: { flexShrink: 1, marginTop: 0 },
+  compactLogoTitle: { fontSize: 26, lineHeight: 32, marginTop: 0 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eyebrowMark: { width: 18, height: 3, borderRadius: 2, backgroundColor: colors.accent },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },

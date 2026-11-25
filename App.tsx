@@ -15,6 +15,7 @@ import AdminMockInterviewDetail from './src/screens/admin/MockInterviewDetail';
 import JobManagement from './src/screens/admin/JobManagement';
 import Dashboard from './src/screens/applicant/Dashboard';
 import ApplicationUpdates from './src/screens/applicant/ApplicationUpdates';
+import Home from './src/screens/auth/Home';
 import Login from './src/screens/auth/Login';
 import Register from './src/screens/auth/Register';
 import Profile from './src/screens/applicant/Profile';
@@ -61,13 +62,14 @@ export default function App() {
 function AppRoutes() {
   const { token, loading } = useContext(AuthContext);
   if (loading) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}><ActivityIndicator color={colors.primary} /><Text style={{ marginTop: 12, color: colors.muted }}>Starting CareerCanvas...</Text></View>;
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}><ActivityIndicator color={colors.primary} /><Text style={{ marginTop: 12, color: colors.muted }}>Starting Galila...</Text></View>;
   }
 
   return (
     <Stack.Navigator>
       {!token ? (
         <>
+          <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
           <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
           <Stack.Screen name="Register" component={Register} options={{ headerShown: false }} />
         </>

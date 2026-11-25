@@ -1,14 +1,18 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import Home from '../src/screens/auth/Home';
 import Login from '../src/screens/auth/Login';
 import Register from '../src/screens/auth/Register';
 import ResumeAnalysis from '../src/screens/applicant/ResumeAnalysis';
 import MockInterview from '../src/screens/applicant/MockInterview';
 import JobRecommendations from '../src/screens/applicant/JobRecommendations';
 import ApplicationUpdates from '../src/screens/applicant/ApplicationUpdates';
+import Dashboard from '../src/screens/applicant/Dashboard';
+import ResumeUpload from '../src/screens/applicant/ResumeUpload';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthContext, AuthProvider } from '../src/context/AuthContext';
 import * as api from '../src/services/api';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Speech from 'expo-speech';
 
 jest.mock('expo-audio', () => ({
@@ -30,6 +34,10 @@ jest.mock('expo-speech', () => ({
   stop: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(),
+}));
+
 jest.mock('../src/services/api', () => ({
   analyzeResume: jest.fn(),
   generateReviewer: jest.fn(),
@@ -38,7 +46,9 @@ jest.mock('../src/services/api', () => ({
   getMockInterview: jest.fn(),
   getResume: jest.fn(),
   applyToJob: jest.fn(),
+  uploadResume: jest.fn(),
   listApplicationUpdates: jest.fn(),
+  listUserResumes: jest.fn(),
   startMockInterview: jest.fn(),
   submitMockInterviewAnswer: jest.fn(),
   submitVerification: jest.fn(),
@@ -52,6 +62,117 @@ test('renders login form', () => {
   );
 
   expect(getByText('Email')).toBeTruthy();
+  expect(getByText('Galila')).toBeTruthy();
+});
+
+test('homepage routes visitors to sign-in and applicant registration', () => {
+  const navigate = jest.fn();
+  const { getByLabelText, getByRole, getAllByRole, getByText } = render(
+    <Home navigation={{ navigate }} />
+  );
+
+  expect(getByLabelText('Galila logo')).toBeTruthy();
+  expect(getByText('Make your next career move with confidence.')).toBeTruthy();
+
+  fireEvent.press(getByRole('button', { name: 'Create applicant account' }));
+  expect(navigate).toHaveBeenCalledWith('Register');
+
+  const signInButtons = getAllByRole('button', { name: 'Sign in' });
+  expect(signInButtons).toHaveLength(1);
+  fireEvent.press(signInButtons[0]);
+  expect(navigate).toHaveBeenCalledWith('Login');
+});
+
+test('feature carousel supports manual navigation, autoplay, and pause', () => {
+  jest.useFakeTimers();
+  const { getByTestId, getByText, getByRole } = render(
+    <Home navigation={{ navigate: jest.fn() }} />
+  );
+
+  try {
+    fireEvent(getByTestId('feature-carousel'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 200 } },
+    });
+
+    expect(getByText('Slide 1 of 3')).toBeTruthy();
+    fireEvent.press(getByRole('button', { name: 'Next feature' }));
+    expect(getByText('Slide 2 of 3')).toBeTruthy();
+
+    fireEvent.press(getByRole('button', { name: 'Resume automatic carousel' }));
+    act(() => jest.advanceTimersByTime(5000));
+    expect(getByText('Slide 3 of 3')).toBeTruthy();
+
+    fireEvent.press(getByRole('button', { name: 'Pause automatic carousel' }));
+    act(() => jest.advanceTimersByTime(10000));
+    expect(getByText('Slide 3 of 3')).toBeTruthy();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('lets visitors return to the homepage from sign-in', () => {
+  const navigation = { navigate: jest.fn() };
+  const { getByRole } = render(<Login navigation={navigation} />);
+
+  fireEvent.press(getByRole('button', { name: 'Back to home' }));
+
+  expect(navigation.navigate).toHaveBeenCalledWith('Home');
+});
+
+test('passes the picked browser file directly to the upload service', async () => {
+  const webFile = new File(['resume contents'], 'resume.pdf', { type: 'application/pdf' });
+  (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({
+    canceled: false,
+    assets: [{
+      uri: 'blob:http://localhost/resume',
+      name: 'resume.pdf',
+      mimeType: 'application/pdf',
+      size: webFile.size,
+      file: webFile,
+    }],
+  });
+  (api.listUserResumes as jest.Mock).mockResolvedValue([]);
+  (api.uploadResume as jest.Mock).mockResolvedValue({ id: 12 });
+  (api.analyzeResume as jest.Mock).mockResolvedValue({ message: 'Analysis queued' });
+  const navigation = { navigate: jest.fn() };
+
+  const { getByRole } = render(
+    <AuthContext.Provider value={{ user: { id: 1, name: 'Test Applicant' }, token: 'token', loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
+      <ResumeUpload navigation={navigation} />
+    </AuthContext.Provider>
+  );
+
+  await waitFor(() => expect(
+    getByRole('button', { name: 'Choose a PDF resume' }).props.accessibilityState?.disabled
+  ).toBe(false));
+  fireEvent.press(getByRole('button', { name: 'Choose a PDF resume' }));
+
+  await waitFor(() => expect(api.uploadResume).toHaveBeenCalledWith(
+    'blob:http://localhost/resume',
+    'resume.pdf',
+    'application/pdf',
+    undefined,
+    webFile,
+  ));
+  expect(DocumentPicker.getDocumentAsync).toHaveBeenCalledWith({
+    type: 'application/pdf',
+    copyToCacheDirectory: true,
+    base64: false,
+  });
+  await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('ResumeAnalysis', { resumeId: 12 }));
+});
+
+test('shows the transparent brand logo beside the applicant welcome heading', async () => {
+  (api.listUserResumes as jest.Mock).mockResolvedValue([]);
+
+  const { findByRole, getByLabelText } = render(
+    <AuthContext.Provider value={{ user: { id: 1, name: 'Test User' }, token: 'abc', loading: false, login: jest.fn(), register: jest.fn(), updateProfile: jest.fn(), logout: jest.fn() }}>
+      <Dashboard navigation={{ navigate: jest.fn() }} />
+    </AuthContext.Provider>
+  );
+
+  expect(await findByRole('header', { name: 'Welcome, Test' })).toBeTruthy();
+  expect(getByLabelText('Galila logo')).toBeTruthy();
 });
 
 test('shows application interview outcomes and reviewer notes', async () => {

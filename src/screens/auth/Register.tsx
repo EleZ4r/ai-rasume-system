@@ -3,7 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../services/api';
-import { ActionButton, Card, Field, Header, Screen } from '../../components/AppUI';
+import { ActionButton, BrandLogo, Card, Field, Header, Screen } from '../../components/AppUI';
 import { colors } from '../../constants/theme';
 
 function ConsentSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -53,7 +53,7 @@ export default function Register({ navigation }: any) {
         <Screen scroll>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.layout, compact && styles.compactLayout]}>
             <View style={[styles.brandRow, compact && styles.compactBrandRow]}>
-              <View style={styles.brandIcon}><Ionicons name="sparkles" size={23} color="#a8ccff" /></View>
+              <BrandLogo size={46} />
               <View>
                 <Text style={styles.brandName}>Galila</Text>
                 <Text style={styles.brandCaption}>AI RESUME WORKSPACE</Text>
@@ -164,7 +164,7 @@ export default function Register({ navigation }: any) {
           <View style={styles.modalPanel}>
             <View style={styles.modalHeader}>
               <View style={styles.modalBrandRow}>
-                <View style={styles.modalBrandIcon}><Ionicons name="shield-checkmark-outline" size={19} color={colors.primary} /></View>
+                <BrandLogo size={24} />
                 <Text style={styles.modalBrand}>GALILA · PRIVACY</Text>
               </View>
               <Text style={styles.documentTitle}>Your data, your rights.</Text>
@@ -301,7 +301,6 @@ const styles = StyleSheet.create({
   compactLayout: { marginVertical: 12 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 30 },
   compactBrandRow: { marginBottom: 20 },
-  brandIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   brandName: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   brandCaption: { color: '#8795a8', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 3 },
   hero: { marginBottom: 22 },
@@ -335,7 +334,6 @@ const styles = StyleSheet.create({
   modalPanel: { width: '100%', maxWidth: 680, height: '92%', maxHeight: 820, backgroundColor: colors.surface, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', elevation: 12, shadowColor: colors.ink, shadowOpacity: 0.18, shadowRadius: 28, shadowOffset: { width: 0, height: 14 } },
   modalHeader: { paddingHorizontal: 22, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: '#fbfcfe' },
   modalBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  modalBrandIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   modalBrand: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   documentScroll: { flex: 1 },
   documentContent: { paddingHorizontal: 22, paddingVertical: 14 },

@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, KeyboardAvoidingView, Platform, Pressabl
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../services/api';
-import { ActionButton, Card, Field, Screen } from '../../components/AppUI';
+import { ActionButton, BrandLogo, Card, Field, Screen } from '../../components/AppUI';
 
 export default function Login({ navigation }: any) {
   const compact = useWindowDimensions().width < 420;
@@ -31,9 +31,9 @@ export default function Login({ navigation }: any) {
     <Screen scroll>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.layout, compact && styles.compactLayout]}>
         <View style={[styles.brandRow, compact && styles.compactBrandRow]}>
-          <View style={styles.brandIcon}><Ionicons name="sparkles" size={24} color="#a8ccff" /></View>
+          <BrandLogo size={46} />
           <View>
-            <Text style={styles.brandName}>GAlila</Text>
+            <Text style={styles.brandName}>Galila</Text>
             <Text style={styles.brandCaption}>AI RESUME WORKSPACE</Text>
           </View>
         </View>
@@ -115,6 +115,14 @@ export default function Login({ navigation }: any) {
           <Ionicons name="shield-checkmark-outline" size={16} color="#71829a" />
           <Text style={styles.trustText}>Your account and career information stay private.</Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('Home')}
+          style={styles.homeLink}
+        >
+          <Ionicons name="arrow-back-outline" size={15} color="#52627a" />
+          <Text style={styles.homeLinkText}>Back to home</Text>
+        </Pressable>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -125,7 +133,6 @@ const styles: Record<string, any> = {
   compactLayout: { marginVertical: 12 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 30 },
   compactBrandRow: { marginBottom: 20 },
-  brandIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#12233f', alignItems: 'center', justifyContent: 'center' },
   brandName: { color: '#12233f', fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
   brandCaption: { color: '#8795a8', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 3 },
   hero: { marginBottom: 22 },
@@ -152,4 +159,6 @@ const styles: Record<string, any> = {
   accountNote: { color: '#8795a8', fontSize: 11, textAlign: 'center', marginTop: 12 },
   trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 17 },
   trustText: { color: '#71819a', fontSize: 11 },
+  homeLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, marginTop: 4 },
+  homeLinkText: { color: '#52627a', fontSize: 12, fontWeight: '700' },
 };
